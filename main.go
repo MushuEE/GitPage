@@ -19,7 +19,7 @@ import (
 )
 
 const clientID = "834fdfb3c1711e44cc04"
-const clientSecret = "6b0b093f09ecb7e66189d87ea6bb360fd1d48c95"
+const clientSecret = "<>"
 
 // type Page struct {
 // 	Title string
