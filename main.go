@@ -43,7 +43,7 @@ type OAuthAccessResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-func renderTemplate(w http.ResponseWriter, tmpl string, repos []*github.Repository) {
+func renderTemplate(w http.ResponseWriter, tmpl string, repos []*github.PullRequestReview) {
 	t := template.Must(template.ParseGlob("./templates/*"))
 	err := t.ExecuteTemplate(w, "repos", repos)
 	if err != nil {
@@ -52,57 +52,6 @@ func renderTemplate(w http.ResponseWriter, tmpl string, repos []*github.Reposito
 	}
 }
 
-func redirectHandler(w http.ResponseWriter, r *http.Request) {
-	// First, we need to get the value of the `code` query param
-	httpClient := http.Client{}
-
-	err := r.ParseForm()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "could not parse query: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-	}
-	code := r.FormValue("code")
-
-	// Next, lets for the HTTP request to call the github oauth enpoint
-	// to get our access token
-	reqURL := fmt.Sprintf("https://github.com/login/oauth/access_token?client_id=%s&client_secret=%s&code=%s", clientID, clientSecret, code)
-	req, err := http.NewRequest(http.MethodPost, reqURL, nil)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "could not create HTTP request: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-	}
-	// We set this header since we want the response
-	// as JSON
-	req.Header.Set("accept", "application/json")
-
-	// Send out the HTTP request
-	res, err := httpClient.Do(req)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "could not send HTTP request: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-	defer res.Body.Close()
-
-	// Parse the request body into the `OAuthAccessResponse` struct
-	var t OAuthAccessResponse
-	if err := json.NewDecoder(res.Body).Decode(&t); err != nil {
-		fmt.Fprintf(os.Stdout, "could not parse JSON response: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-	}
-
-	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: t.AccessToken},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-
-	client := github.NewClient(tc)
-
-	// list all repositories for the authenticated user
-	repos, _, err := client.Repositories.List(ctx, "", nil)
-	fmt.Println(repos)
-	renderTemplate(w, "repos", repos)
-}
 
 func main() {
 	fs := http.FileServer(http.Dir("templates"))
@@ -161,7 +110,8 @@ func main() {
 		client := github.NewClient(tc)
 
 		// list all repositories for the authenticated user
-		repos, _, err := client.Repositories.List(ctx, "", nil)
+		// repos, _, err := client.Repositories.List(ctx, "", nil)
+		repos, _, err := client.PullRequests.ListReviews(ctx, "google", "triage-party", 193, &github.ListOptions{})
 		fmt.Println(repos)
 		renderTemplate(w, "repos", repos)
 	})
