@@ -43,6 +43,11 @@ type OAuthAccessResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
+type App struct {
+	clientID     string
+	clientSecret string
+}
+
 func renderTemplate(w http.ResponseWriter, tmpl string, repos []*github.PullRequestReview) {
 	t := template.Must(template.ParseGlob("./templates/*"))
 	err := t.ExecuteTemplate(w, "repos", repos)
@@ -52,10 +57,27 @@ func renderTemplate(w http.ResponseWriter, tmpl string, repos []*github.PullRequ
 	}
 }
 
+func (app *App) login(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("method:", r.Method) //get request method
+	if r.Method == "GET" {
+		t, _ := template.ParseFiles("./templates/login.gtpl")
+		t.Execute(w, nil)
+	} else {
+		r.ParseForm()
+		// logic part of log in
+		fmt.Println("username:", r.Form["username"])
+		fmt.Println("password:", r.Form["password"])
+		app.clientID = r.Form["username"][0]
+		app.clientSecret = r.Form["password"][0]
+
+	}
+}
 
 func main() {
 	fs := http.FileServer(http.Dir("templates"))
+	app := &App{}
 	http.Handle("/", fs)
+	http.HandleFunc("/login", app.login)
 
 	// We will be using `httpClient` to make external HTTP requests later in our code
 	httpClient := http.Client{}
@@ -72,7 +94,7 @@ func main() {
 
 		// Next, lets for the HTTP request to call the github oauth enpoint
 		// to get our access token
-		reqURL := fmt.Sprintf("https://github.com/login/oauth/access_token?client_id=%s&client_secret=%s&code=%s", clientID, clientSecret, code)
+		reqURL := fmt.Sprintf("https://github.com/login/oauth/access_token?client_id=%s&client_secret=%s&code=%s", app.clientID, app.clientSecret, code)
 		req, err := http.NewRequest(http.MethodPost, reqURL, nil)
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "could not create HTTP request: %v", err)
